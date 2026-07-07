@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD // Cash on Delivery
+  BANK_TRANSFER
+  CREDIT_CARD
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String   @unique
+  password  String
+  phone     String?
+  role      Role     @default(USER)
+  ipAddress String?
+  hasAcceptedConsent Boolean @default(false)
+  consentDate        DateTime?
+  isApproved         Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  orders    Order[]
+  reviews   Review[]
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  isActive  Boolean    @default(true)
+  parentId  String?
+  parent    Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryToCategory")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  imageUrl  String?    
+
+  products  Product[]
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  price         Float
+  originalPrice Float?
+  isNew         Boolean   @default(false)
+  isDiscounted  Boolean   @default(false)
+  stock         Int      @default(0)
+  storeInfo       String?   
+  deliveryInfo    String?   
+  installmentInfo String?   
+  productDetails  String?   
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  images String[] // Array of image URLs
+  videoUrl    String?  
+  showVideoInSlider Boolean @default(true)
+  colors String[] @default([]) // Array of available colors
+  sizes String[] @default([]) // Array of available sizes
+  colorImages Json?    // Maps colors to image URLs
+  colorPrices Json?    // Maps colors to prices { "Red": { "price": 100, "originalPrice": 120 } }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  variants    Variant[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  favorites   Favorite[]
+}
+
+model Variant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String   // e.g., "Color", "Size"
+  value     String   // e.g., "Red", "XL"
+  stock     Int      @default(0)
+  price     Float?   // Optional override price for this variant
+  sku       String?  @unique
+  
+  orderItems OrderItem[]
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userEmail String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant   String?
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // A user can have only one unique combination of product+variant in their cart
+  @@unique([userEmail, productId, variant])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userEmail String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userEmail, productId])
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  status          OrderStatus   @default(PENDING)
+  totalAmount     Float
+  paymentMethod   PaymentMethod
+  firstName       String?
+  lastName        String?
+  phone           String?
+  email           String?
+  address         String?
+  trackingCompany String?
+  trackingNumber  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  cancelReason    String?
+
+  orderItems      OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   Variant? @relation(fields: [variantId], references: [id])
+  quantity  Int
+  price     Float    // Price at the time of purchase
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating     Int      @default(5)
+  comment    String
+  adminReply String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Coupon {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  discountType  DiscountType
+  discountValue Float
+  minPurchase   Float?
+  expiryDate    DateTime?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model LayoutBlock {
+  id        String   @id @default(cuid())
+  type      String   // e.g., "HERO_SLIDER", "FEATURED_PRODUCTS", "BANNER"
+  order     Int      @default(0)
+  data      Json     // Flexible JSON payload for block content
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  content   String   
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
